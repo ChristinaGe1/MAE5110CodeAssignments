@@ -1,9 +1,5 @@
 from models import rimless_wheel as model
 
-# The Floquet multiplier of the rolling limit cycle is the local slope of the
-# 1-D return map at its fixed point: |f'(v*)| < 1 means the limit cycle is
-# locally stable (perturbations shrink step to step).
-
 params = model.generate_params()
 fixed_point = model.find_fixed_point(params)
 

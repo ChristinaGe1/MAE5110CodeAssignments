@@ -5,11 +5,6 @@ import numpy as np
 
 from models import rimless_wheel as model
 
-# Sweep two parameters and see how each affects the rolling limit cycle
-# (fixed point, Floquet multiplier) and the shape of its RoA:
-#   1. the incline angle gamma
-#   2. the number of spokes N (6 to 12)
-
 PERTURBATION = 1e-4
 THETA_RANGE = np.linspace(-1.5, 1.5, 25)
 THETA_DOT_RANGE = np.linspace(-6.0, 6.0, 25)
@@ -38,7 +33,7 @@ def sweep_fixed_point_and_floquet(base_params, param_values, make_params):
         try:
             fixed_point = model.find_fixed_point(params)
         except RuntimeError:
-            continue  # no self-consistent rolling gait at this parameter value
+            continue
         mapped_minus = model.poincare_map(fixed_point - PERTURBATION, params)
         mapped_plus = model.poincare_map(fixed_point + PERTURBATION, params)
         fixed_points[i] = fixed_point
@@ -88,7 +83,6 @@ def plot_roa_panels(base_params, param_values, make_params, label_fn, title, fil
 base_params = model.generate_params()
 alpha = base_params["half_spoke_angle"]
 
-# --- Sweep 1: incline angle gamma -------------------------------------------
 incline_angles_deg = np.linspace(2, 40, 20)
 fixed_points, floquet_multipliers = sweep_fixed_point_and_floquet(
     base_params, incline_angles_deg, with_incline
@@ -112,7 +106,6 @@ plot_roa_panels(
     "figures/assignment_1_sweep_incline_roa.png",
 )
 
-# --- Sweep 2: number of spokes N ---------------------------------------------
 num_spokes_values = np.arange(6, 13)
 fixed_points_n, floquet_multipliers_n = sweep_fixed_point_and_floquet(
     base_params, num_spokes_values, with_num_spokes

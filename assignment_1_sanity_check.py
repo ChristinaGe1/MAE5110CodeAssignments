@@ -3,24 +3,12 @@ import numpy as np
 
 from models import rimless_wheel as model
 
-# Sanity checks for the rimless-wheel model.
-#
-# 1. Within a single stance phase, there is no damping and no actuation, so
-#    total mechanical energy (relative to the current pivot) should stay
-#    constant. If it drifts, the guard/RK4 combination is buggy.
-# 2. At each impact, the plastic collision should remove a known, fixed
-#    fraction of kinetic energy: KE^+ / KE^- = cos(2*alpha)^2, independent of
-#    the impact velocity. We check this numerically across many impacts.
-# 3. Released on a slope steeper than the spoke half-angle, the wheel should
-#    roll forever, with the impact velocity converging to a steady value
-#    (the rolling limit cycle) rather than growing or decaying to zero.
-
 params = model.generate_params()
 alpha = params["half_spoke_angle"]
 
 # --- Check 1: energy conservation within a stance phase ---------------------
 initial_state = np.array([params["incline_angle"], 0.5])
-short_duration = 0.05  # short enough to stay within one stance phase
+short_duration = 0.05
 result = model.simulate(initial_state, params, short_duration)
 
 kinetic_energy, potential_energy = model.calculate_energy(result["state"], params)

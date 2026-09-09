@@ -6,11 +6,11 @@ from integrators import rk4 as integrator
 def generate_params():
     num_spokes = 8
     params = {
-        "gravity": 9.81,  # gravity (m/s^2)
-        "spoke_length": 1.0,  # distance from stance pivot to hub (m)
-        "num_spokes": num_spokes,  # number of evenly spaced spokes
-        "half_spoke_angle": np.pi / num_spokes,  # alpha = pi / N (rad)
-        "incline_angle": np.deg2rad(10),  # downhill slope of the ground (rad)
+        "gravity": 9.81,
+        "spoke_length": 1.0,
+        "num_spokes": num_spokes,
+        "half_spoke_angle": np.pi / num_spokes,
+        "incline_angle": np.deg2rad(10),
     }
     return params
 
@@ -22,8 +22,6 @@ def dynamics(t, state, params):
     angle = state[0]
     angular_velocity = state[1]
 
-    # Inverted pendulum about the (fixed) stance pivot; the incline does not
-    # enter here since theta is measured from true vertical, not the slope.
     angular_acceleration = (gravity / spoke_length) * np.sin(angle)
 
     state_derivative = np.array([angular_velocity, angular_acceleration])
@@ -31,22 +29,16 @@ def dynamics(t, state, params):
 
 
 def touchdown_angle(params):
-    """Stance angle, measured from vertical, at which the leading spoke strikes the ground."""
     return params["incline_angle"] + params["half_spoke_angle"]
 
 
 def detect_event(state, params):
-    """Guard function. An impact occurs when this crosses zero from below."""
     angle = state[0]
     return angle - touchdown_angle(params)
 
 
 def reset_state(state, params):
-    """Plastic collision: relabel the new stance spoke and update velocity.
-
-    Angular momentum about the new contact point is conserved:
-    theta_dot^+ = theta_dot^- * cos(2 * alpha).
-    """
+    """Plastic collision: relabel the new stance spoke and update velocity."""
     angle, angular_velocity = state
     alpha = params["half_spoke_angle"]
 
@@ -56,9 +48,7 @@ def reset_state(state, params):
 
 
 def calculate_energy(state, params):
-    """Compute (kinetic, potential) energy per unit mass, relative to the current
-    stance pivot. Valid for a state ``(2,)`` or a trajectory ``(2, N)`` within a
-    single stance phase (the reference pivot changes at each impact)."""
+    """Kinetic and potential energy per unit mass, relative to the current stance pivot."""
     gravity = params["gravity"]
     spoke_length = params["spoke_length"]
 
@@ -71,8 +61,7 @@ def calculate_energy(state, params):
 
 
 def find_impact(t0, state0, timestep, params, tolerance=1e-10, max_iterations=60):
-    """Bisect within [t0, t0 + timestep] to locate the impact time precisely,
-    given that the guard is known to change sign over that interval."""
+    """Bisect within [t0, t0 + timestep] to locate the impact time precisely."""
     low, high = 0.0, timestep
     impact_state = state0
     for _ in range(max_iterations):
@@ -90,12 +79,7 @@ def find_impact(t0, state0, timestep, params, tolerance=1e-10, max_iterations=60
 
 
 def simulate(initial_state, params, sim_duration, max_timestep=2e-3):
-    """Simulate the hybrid rimless-wheel dynamics for `sim_duration` seconds.
-
-    Uses a fixed-timestep RK4 integrator for the smooth swing phase (which does
-    not need a tiny timestep to stay accurate), and only refines the timestep
-    near an impact, via bisection, to precisely locate the guard crossing.
-    """
+    """Simulate the hybrid rimless-wheel dynamics for `sim_duration` seconds."""
     time = 0.0
     state = np.asarray(initial_state, dtype=float)
 
@@ -141,10 +125,7 @@ def simulate(initial_state, params, sim_duration, max_timestep=2e-3):
 
 
 def poincare_map(post_impact_velocity, params, max_duration=10.0):
-    """Step-to-step return map: given the angular velocity right after an
-    impact, simulate one stance phase and return the angular velocity right
-    after the *next* impact. Returns None if the guard is never reached
-    (state is outside the rolling basin of attraction)."""
+    """Step-to-step return map. Returns None if the guard is never reached."""
     alpha = params["half_spoke_angle"]
     initial_state = np.array(
         [touchdown_angle(params) - 2 * alpha, post_impact_velocity]
@@ -181,9 +162,7 @@ def find_fixed_point(params, bracket=(0.8, 10.0), tolerance=1e-10, max_iteration
 def compute_roa_grid(
     params, theta_range, theta_dot_range, sim_duration=20.0, steady_state_window=5.0
 ):
-    """Brute-force region-of-attraction grid for the rolling limit cycle.
-    Returns a boolean array, shape (len(theta_dot_range), len(theta_range)),
-    True where the initial condition converges to sustained rolling."""
+    """Brute-force region-of-attraction grid for the rolling limit cycle."""
     rolling_map = np.zeros((len(theta_dot_range), len(theta_range)), dtype=bool)
     for i, theta_dot0 in enumerate(theta_dot_range):
         for j, theta0 in enumerate(theta_range):
