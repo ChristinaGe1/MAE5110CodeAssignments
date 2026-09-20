@@ -1,7 +1,11 @@
-"""InvertedPendulumWalker starter model, with visualization provided.
+"""InvertedPendulumWalker model, with visualization provided.
 
-Implement the model functions for Assignment 2. The visualizer works independently
-of those functions; it draws a supplied state without advancing the simulation.
+Like the rimless wheel, this is a hybrid model: continuous pendulum dynamics
+during stance, with an impulsive reset at touchdown. The two differences are
+an ankle torque summed into the continuous dynamics, and a landing angle of
+attack that is a free control input each step rather than a fixed spoke
+geometry. Controllers (how to choose that torque and angle of attack) live in
+the experiment scripts, not here.
 """
 
 import matplotlib.pyplot as plt
@@ -9,24 +13,64 @@ import numpy as np
 
 
 def generate_params():
-    pass
+    return {
+        "gravity": 9.81,  # m/s^2
+        "length": 1.0,  # m
+        "mass": 1.0,  # kg
+        "incline": 0.06,  # rad
+        "angle_of_attack": np.pi / 8,  # rad, half-angle between stance and swing legs
+        "ankle_torque": 0.0,  # N m, defaults off
+    }
 
 
 def dynamics(t, state, params):
-    # TODO: implement the state derivative.
-    return np.array([0.0, 0.0])
+    gravity = params["gravity"]
+    length = params["length"]
+    mass = params["mass"]
+    torque = params.get("ankle_torque", 0.0)
+
+    angle, angular_velocity = state
+    angular_acceleration = (gravity / length) * np.sin(angle) + torque / (mass * length**2)
+    return np.array([angular_velocity, angular_acceleration])
+
+
+def touchdown_angle(params):
+    """Stance angle at which the swing foot reaches the inclined ground.
+
+    Independent of leg length: geometry alone gives theta_touchdown = incline
+    + angle_of_attack (same relation as the rimless wheel's fixed spokes).
+    """
+    return params["incline"] + params["angle_of_attack"]
 
 
 def event_guard(previous_state, next_state, params):
-    pass
+    """True on the timestep the stance angle crosses the touchdown angle."""
+    guard = touchdown_angle(params)
+    return previous_state[0] < guard <= next_state[0]
 
 
 def event_dynamics(state, params):
-    pass
+    """Plastic impact: relabel the new stance leg and update velocity."""
+    angle, angular_velocity = state
+    alpha = params["angle_of_attack"]
+
+    new_angle = angle - 2 * alpha
+    new_angular_velocity = angular_velocity * np.cos(2 * alpha)
+    return np.array([new_angle, new_angular_velocity])
 
 
 def calculate_energy(state, params):
-    pass
+    """Kinetic and potential energy for a state (2,) or trajectory (2, N)."""
+    gravity = params["gravity"]
+    length = params["length"]
+    mass = params["mass"]
+
+    angle = state[0]
+    angular_velocity = state[1]
+
+    kinetic_energy = 0.5 * mass * (length * angular_velocity) ** 2
+    potential_energy = mass * gravity * length * np.cos(angle)
+    return kinetic_energy, potential_energy
 
 
 def visualize(
