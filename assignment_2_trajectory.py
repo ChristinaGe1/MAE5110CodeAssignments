@@ -42,8 +42,29 @@ def choose_alpha(theta_dot):
     return alpha_grid[control_index] if control_index >= 0 else alpha_grid[0]
 
 
-def simulate_trajectory(initial_theta_dot, timestep=1e-3, max_time=30.0):
-    """Walk under the lookup-table policy, then stand once inside the RoA."""
+def optimal_policy(step_count, state):
+    """The lookup table's minimum-steps policy."""
+    return choose_alpha(state[1])
+
+
+def forced_policy(alpha_indices):
+    """Play out a fixed sequence of landing angles, then fall back to the
+    optimal policy once the sequence is exhausted (only relevant if the
+    forced sequence doesn't reach the RoA on its own, which shouldn't happen
+    along a path returned by `find_longest_path`)."""
+
+    def policy(step_count, state):
+        if step_count < len(alpha_indices):
+            return alpha_grid[alpha_indices[step_count]]
+        return choose_alpha(state[1])
+
+    return policy
+
+
+def simulate_trajectory(initial_theta_dot, choose_alpha_for_step, timestep=1e-3, max_time=30.0):
+    """Walk under a given per-step angle-of-attack policy, then stand once
+    inside the RoA. `choose_alpha_for_step(step_count, state)` picks the
+    landing angle of attack for the upcoming step."""
     state = np.array([0.0, initial_theta_dot])
     sim_params = dict(params)
     standing = False
@@ -59,7 +80,7 @@ def simulate_trajectory(initial_theta_dot, timestep=1e-3, max_time=30.0):
             if controller.in_roa(state, theta_range, theta_dot_range, roa_grid):
                 standing = True
             else:
-                sim_params["angle_of_attack"] = choose_alpha(state[1])
+                sim_params["angle_of_attack"] = choose_alpha_for_step(step_count, state)
             at_midstance = False
 
         sim_params["ankle_torque"] = (
@@ -94,14 +115,17 @@ def find_longest_path(start_index, max_depth, max_nodes=300_000):
     assumption that the walker never deliberately revisits the same discretized
     speed twice (revisiting would let it stall indefinitely, which is a
     resolution artifact rather than a meaningful gait).
+
+    Returns the sequence of control (angle-of-attack) indices along the
+    longest such path, so the corresponding trajectory can be replayed.
     """
-    best_depth = 0
+    best_path = []
     nodes_visited = 0
 
-    def visit(index, visited, depth):
-        nonlocal best_depth, nodes_visited
+    def visit(index, visited, path):
+        nonlocal best_path, nodes_visited
         nodes_visited += 1
-        if nodes_visited > max_nodes or depth >= max_depth:
+        if nodes_visited > max_nodes or len(path) >= max_depth:
             return
         for control_index in range(transition_table.shape[1]):
             next_speed = transition_table[index, control_index]
@@ -110,14 +134,15 @@ def find_longest_path(start_index, max_depth, max_nodes=300_000):
             next_index = controller.nearest_index(next_speed, theta_dot_grid)
             if next_index in visited:
                 continue
-            new_depth = depth + 1
+            new_path = path + [control_index]
             if already_standing[next_index]:
-                best_depth = max(best_depth, new_depth)
+                if len(new_path) > len(best_path):
+                    best_path = new_path
                 continue
-            visit(next_index, visited | {next_index}, new_depth)
+            visit(next_index, visited | {next_index}, new_path)
 
-    visit(start_index, {start_index}, 0)
-    return best_depth
+    visit(start_index, {start_index}, [])
+    return best_path
 
 
 # --- Pick an initial condition that needs at least 3 steps -------------------
@@ -128,23 +153,36 @@ print(f"Initial mid-stance speed: {initial_theta_dot:.3f} rad/s")
 print(f"Minimum steps to standstill (lookup table): {int(steps_to_standstill[start_index])}")
 
 max_depth = 2 * int(steps_to_standstill[start_index]) + 4
-longest = find_longest_path(start_index, max_depth)
-print(f"Longest valid non-repeating footstep sequence before reaching the RoA: {longest} steps")
+longest_path = find_longest_path(start_index, max_depth)
+print(
+    f"Longest valid non-repeating footstep sequence before reaching the RoA: "
+    f"{len(longest_path)} steps"
+)
 
-time_traj, state_traj, step_count = simulate_trajectory(initial_theta_dot)
-print(f"Simulated trajectory took {step_count} footsteps to reach standstill")
+time_traj, state_traj, step_count = simulate_trajectory(initial_theta_dot, optimal_policy)
+print(f"Simulated trajectory (optimal policy) took {step_count} footsteps to reach standstill")
+
+longest_time_traj, longest_state_traj, longest_step_count = simulate_trajectory(
+    initial_theta_dot, forced_policy(longest_path)
+)
+print(f"Simulated trajectory (longest valid path) took {longest_step_count} footsteps")
 
 output = Path("output/assignment_2")
 output.mkdir(parents=True, exist_ok=True)
 
 fig, axes = plt.subplots(2, 1, sharex=True, figsize=(7, 6), layout="constrained")
-axes[0].plot(time_traj, state_traj[0])
-axes[0].set_ylabel(r"$\theta$ (rad)")
-axes[0].set_title(
-    f"Trajectory from $\\dot\\theta_0$ = {initial_theta_dot:.3f} rad/s "
-    f"({step_count} steps to standstill)"
+axes[0].plot(time_traj, state_traj[0], label=f"optimal policy ({step_count} steps)")
+axes[0].plot(
+    longest_time_traj,
+    longest_state_traj[0],
+    "--",
+    label=f"longest valid path ({longest_step_count} steps)",
 )
+axes[0].set_ylabel(r"$\theta$ (rad)")
+axes[0].set_title(f"Trajectories from $\\dot\\theta_0$ = {initial_theta_dot:.3f} rad/s")
+axes[0].legend()
 axes[1].plot(time_traj, state_traj[1])
+axes[1].plot(longest_time_traj, longest_state_traj[1], "--")
 axes[1].set_ylabel(r"$\dot\theta$ (rad/s)")
 axes[1].set_xlabel("time (s)")
 plt.savefig(output / "trajectory.png")

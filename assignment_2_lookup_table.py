@@ -34,48 +34,44 @@ roa_grid = roa_data["roa_grid"]
 
 def solve_for_resolution(n_states):
     theta_dot_grid = np.linspace(0.0, froude_velocity, n_states)
-    table = controller.build_transition_table(theta_dot_grid, alpha_grid, params)
+    transition_table = controller.build_transition_table(theta_dot_grid, alpha_grid, params)
     already_standing = np.array(
         [controller.in_roa((0.0, td), theta_range, theta_dot_range, roa_grid) for td in theta_dot_grid]
     )
-    steps, best_alpha = controller.solve_min_steps_policy(theta_dot_grid, table, already_standing)
-    return theta_dot_grid, steps, best_alpha
+    steps, best_alpha_index = controller.solve_min_steps_policy(
+        theta_dot_grid, transition_table, already_standing
+    )
+    return theta_dot_grid, transition_table, already_standing, steps, best_alpha_index
 
 
 # --- Grid resolution check ---------------------------------------------------
 # Compare the minimum-steps count for a fixed set of test speeds across
-# increasingly fine grids; resolution is "fine enough" once the answer stops
-# changing as the grid is refined further.
+# increasingly fine grids. A resolution is converged once its answer matches
+# every finer grid; a match with only the next grid can be coincidental.
 test_speeds = np.linspace(0.5, 0.9 * froude_velocity, 6)
 resolutions = [10, 20, 40, 80, 160]
 
 print("Grid resolution check (steps-to-standstill at fixed test speeds):")
-previous_steps_at_test = None
-previous_n = None
+solutions = {}
+steps_at_test = {}
 for n_states in resolutions:
-    theta_dot_grid, steps, _ = solve_for_resolution(n_states)
-    steps_at_test = np.array(
+    solutions[n_states] = solve_for_resolution(n_states)
+    theta_dot_grid, _, _, steps, _ = solutions[n_states]
+    steps_at_test[n_states] = np.array(
         [steps[controller.nearest_index(v, theta_dot_grid)] for v in test_speeds]
     )
-    print(f"  n_states={n_states:4d}: {steps_at_test}")
-    if previous_steps_at_test is not None:
-        if np.array_equal(steps_at_test, previous_steps_at_test):
-            print(f"    -> matches n_states={previous_n}, resolution looks converged")
-        else:
-            print(f"    -> differs from n_states={previous_n}, previous grid was too coarse")
-    previous_steps_at_test = steps_at_test
-    previous_n = n_states
+    print(f"  n_states={n_states:4d}: {steps_at_test[n_states]}")
 
-# Use the finest tested resolution for the deliverable table and plot.
-final_n_states = resolutions[-1]
-theta_dot_grid = np.linspace(0.0, froude_velocity, final_n_states)
-transition_table = controller.build_transition_table(theta_dot_grid, alpha_grid, params)
-already_standing = np.array(
-    [controller.in_roa((0.0, td), theta_range, theta_dot_range, roa_grid) for td in theta_dot_grid]
+final_n_states = next(
+    n
+    for i, n in enumerate(resolutions)
+    if all(np.array_equal(steps_at_test[n], steps_at_test[finer]) for finer in resolutions[i + 1 :])
 )
-steps_to_standstill, best_alpha_index = controller.solve_min_steps_policy(
-    theta_dot_grid, transition_table, already_standing
-)
+print(f"Coarsest converged grid: n_states={final_n_states}")
+
+theta_dot_grid, transition_table, already_standing, steps_to_standstill, best_alpha_index = solutions[
+    final_n_states
+]
 
 output = Path("output/assignment_2")
 output.mkdir(parents=True, exist_ok=True)
