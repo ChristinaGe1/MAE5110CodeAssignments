@@ -23,6 +23,10 @@ def generate_params():
     }
 
 
+def generate_initial_condition():
+    return np.array([0.0, 0.0])
+
+
 def dynamics(t, state, params):
     gravity = params["gravity"]
     length = params["length"]
@@ -30,7 +34,9 @@ def dynamics(t, state, params):
     torque = params.get("ankle_torque", 0.0)
 
     angle, angular_velocity = state
-    angular_acceleration = (gravity / length) * np.sin(angle) + torque / (mass * length**2)
+    angular_acceleration = (gravity / length) * np.sin(angle) + torque / (
+        mass * length**2
+    )
     return np.array([angular_velocity, angular_acceleration])
 
 

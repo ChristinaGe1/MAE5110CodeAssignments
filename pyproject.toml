@@ -8,21 +8,13 @@ version = "0.1.0"
 description = "Course exercises for MAE 5110"
 readme = "README.md"
 requires-python = ">=3.14"
-dependencies = [
-    "matplotlib",
-    "numpy",
-    "ruff"
-]
+dependencies = ["matplotlib", "numpy", "ruff"]
 
 [dependency-groups]
-dev = [
-    "pytest",
-]
-notebooks = [
-    "marimo>=0.25",
-    "jupytext",
-]
+dev = ["pytest"]
+notebooks = ["marimo>=0.25", "jupytext"]
 
 [tool.setuptools]
 packages = ["models", "algorithms"]
-package-dir = {"" = "."}
+py-modules = ["integrators"]
+package-dir = { "" = "." }
