@@ -49,4 +49,4 @@ Increasing the number of spokes makes the system closer to a fully circular whee
 We can plot the actual ROA vs gamma and N graphs also to see exactly how changing the gamma and the spoke number affect the ROA plot.
 
 ![Return Map Plot](roa_vs_gamma.png)
-![Return Map Plot](roa_vs_N.png)
+![Return Map Plot](roa_vs_N.png)# Assignment 2: Inverted Pendulum Walker — Report
