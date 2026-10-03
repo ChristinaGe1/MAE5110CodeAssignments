@@ -23,6 +23,10 @@ notebooks = [
     "jupytext",
 ]
 
+# The value-iteration animation (500 frames) is about 10 MB, above marimo's 8 MB default.
+[tool.marimo.runtime]
+output_max_bytes = 16_000_000
+
 [tool.setuptools]
 packages = ["models", "algorithms"]
 package-dir = {"" = "."}
