@@ -29,7 +29,7 @@ state_traj[:, 0] = initial_state
 def sim():
     for step, t in enumerate(time_traj[:-1]):
         state_traj[:, step + 1] = integrator(
-            model.dynamics, t, state_traj[:, step], params, timestep
+            model.dynamics, t, state_traj[:, step], timestep, params
         )
 
 elapsed = timeit.timeit(sim, number=20)
