@@ -1,16 +1,20 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "mae5110"
 version = "0.1.0"
 description = "Course exercises for MAE 5110"
 readme = "README.md"
 requires-python = ">=3.14"
-dependencies = [
-    "matplotlib",
-    "numpy",
-    "ruff"
-]
+dependencies = ["matplotlib", "numpy", "ruff"]
 
 [dependency-groups]
-dev = [
-    "pytest",
-]
+dev = ["pytest"]
+notebooks = ["marimo>=0.25", "jupytext"]
+
+[tool.setuptools]
+packages = ["models", "algorithms"]
+py-modules = ["integrators"]
+package-dir = { "" = "." }
